@@ -3,8 +3,8 @@
 Created on Apr 4, 2012
 
 @author: lanquarden
-
 '''
+
 # @author: Ahmed Nassar
 # This code builds on "lanquarden" code from:
 # https://github.com/lanquarden/pyScrcClient
@@ -69,19 +69,21 @@ class TorcsTrackView(QtGui.QWidget):
     
     def __init__(self):
         super(TorcsTrackView, self).__init__()
-        self.offsetX    = 500;
-        self.offsetY    = 500;
-        self.mult       = 0.5;
+        self.offsetX     = 700;
+        self.offsetY     = 500;
+        self.trackLength = 1908.32;
+        self.standardTrackLength = 1908.32; # Length of oval A-Speedway track
+        self.mult       = 0.5 * (self.standardTrackLength/self.trackLength);
         self.curX       = 0;
         self.curY       = 0;
         self.curTheta   = 0;
         self.curLapTime = 0;
-        self.CAR_LENGTH = 2.0;
+        self.CAR_LENGTH = 0.135;
         self.count      = 0;
         self.rays       = deque([], 10000);
         self.ranges     = deque([], 20);
         self.cx     = 200;
-        self.cy     = 200;
+        self.cy     = 400;
         self.mDash  = 0.75;
         self.rDash  = 150;
         self.lock = threading.Lock();
@@ -114,6 +116,7 @@ class TorcsTrackView(QtGui.QWidget):
         dy = self.offsetY;
         m  = self.mult;
         with self.lock:
+            #print len(self.rays);
             for r in self.rays:
                 #line = QtCore.QLineF(dx + m*r.x1, dy + m*r.y1, dx + m*r.x2, dy + m*r.y2)
                 #qp.drawLine(line);
@@ -131,7 +134,7 @@ class TorcsTrackView(QtGui.QWidget):
         qp.drawEllipse(center, self.rDash, self.rDash);
         qp.setOpacity(0.95)
 
-        # Draw rays
+        # Draw ranges
         with self.lock:
             i = 0;
             for r in self.ranges:
@@ -142,21 +145,30 @@ class TorcsTrackView(QtGui.QWidget):
                 i += 1;
 
 
+    ##############################################
     # Bicycle Model
+    ##############################################
+    # Define the path as a function of its length s.
+    # Theta is the angle between the path tangent at s and the global x axis.
     def updateLocation( self, speed, dt, steeringAngle ):
         ds = speed * dt; # Distance traveled in one time step dt.
-        turnAngle = ds * math.tan( steeringAngle );
-        if ( abs( turnAngle ) < 0.00000001 ):
+        #turnAngle = ds * math.tan( steeringAngle );
+        #if ( abs( turnAngle ) < 0.00000001 ):
+        steeringAngle = steeringAngle * math.pi / 180.0;
+        if ( abs( steeringAngle ) < 0.000001 ):
             nextX = self.curX + ds * math.cos( self.curTheta );
             nextY = self.curY + ds * math.sin( self.curTheta );
             self.curX     = nextX;
             self.curY     = nextY;
             self.curTheta = self.curTheta;
+            #print 'curX={0:.3f}, curY={1:.3f}, curTheta={2:.3f}'.format( self.curX, self.curY, self.curTheta );
         else:
-            beta = ( ds/self.CAR_LENGTH ) * math.tan( steeringAngle );
-            radius = ds / beta;
-            cx = self.curX - radius * math.sin( beta );
-            cy = self.curY + radius * math.cos( beta );
+            radius = self.CAR_LENGTH / math.tan( steeringAngle );
+            beta = ds / radius;
+            #print 'radius={0:.3f}, speed={1:.3f}, dt={2:.3f}, ds={3:.3f}, beta={4:.6f}'.format(
+            #    radius, speed, dt, ds, beta );
+            cx = self.curX - radius * math.sin( self.curTheta );
+            cy = self.curY + radius * math.cos( self.curTheta );
             nextTheta = self.curTheta + beta;
             nextX = cx + radius * math.sin( nextTheta );
             nextY = cy - radius * math.cos( nextTheta );
@@ -164,72 +176,19 @@ class TorcsTrackView(QtGui.QWidget):
             self.curY     = nextY;
             self.curTheta = nextTheta;
 
-##    def updateTrack(self, driver):
-##        self.x += (1.0/3.6) * self.speedX * (driver.state.curLapTime - self.curLapTime);
-##        self.y += (1.0/3.6) * self.speedY * (driver.state.curLapTime - self.curLapTime);
-##        self.curLapTime = driver.state.curLapTime
-##        self.speedX     = driver.state.speedX
-##        self.speedY     = driver.state.speedY
-##
-##        self.count += 1;
-##        if ( self.count < 10 ):
-##            return;
-##        self.count = 0;
-##        N = len(driver.state.track);
-##        with self.lock:
-##            for i in range( 0, N ):
-##                x2 = self.x + driver.state.track[i] * math.cos( driver.state.angle + i*math.pi/N - math.pi/2 );
-##                y2 = self.y + driver.state.track[i] * math.sin( driver.state.angle + i*math.pi/N - math.pi/2 );
-##                self.rays.append( RangeFinderRay( self.x, self.y, x2, y2 ) );
-
-##    def updateTrack(self, driver):
-##        with self.lock:
-##            N = len(driver.state.track);
-##            maxi = 0;
-##            maxDist = -1;
-##            for i in range( 0, N ):
-##                if( driver.state.track[i] > maxDist ):
-##                    maxDist = driver.state.track[i];
-##                    maxi = i;
-##            maxAngle = driver.state.angle + maxi*math.pi/N - math.pi/2;
-##
-##            sx = self.speedX;
-##            sy = self.speedY;
-###           trackSpeed = math.sqrt( sx*sx + sy*sy ) * math.cos( self.angle );
-##            trackSpeed = sx * math.cos( self.angle ) - sy * math.sin( self.angle );
-##            dt = (driver.state.curLapTime - self.curLapTime);
-##            ds = (1.0/3.6) * trackSpeed * dt;
-##
-##            self.x += ds * math.cos( self.maxAngle );
-##            self.y += ds * math.sin( self.maxAngle );
-##            self.curLapTime = driver.state.curLapTime;
-##            self.speedX     = driver.state.speedX;
-##            self.speedY     = driver.state.speedY;
-##            self.angle      = driver.state.angle;
-##            self.maxAngle   = maxAngle;
-##
-##            self.count += 1;
-##            if ( self.count < 10 ):
-##                return;
-##            self.count = 0;
-##            for i in range( 0, N ):
-##                x2 = self.x + driver.state.track[i] * math.cos( driver.state.angle + i*math.pi/N - math.pi/2 );
-##                y2 = self.y + driver.state.track[i] * math.sin( driver.state.angle + i*math.pi/N - math.pi/2 );
-##                self.rays.append( RangeFinderRay( self.x, self.y, x2, y2 ) );
-##
 
     def updateTrack(self, driver):
         with self.lock:
             sx = driver.state.speedX;
             sy = driver.state.speedY;
-            trackSpeed = sx * math.cos( driver.state.angle ) + sy * math.cos( math.pi/2 - driver.state.angle );
+            trackSpeed = sx * math.cos( driver.state.angle ) + sy * math.sin( driver.state.angle );
             trackSpeed = (1.0/3.6) * trackSpeed; # km/h to m/s
             dt = (driver.state.curLapTime - self.curLapTime);
             ds = trackSpeed * dt;
 
-            steeringAngle = driver.steeringAngle;
+            steeringAngle = - driver.steeringAngle;
             self.updateLocation( trackSpeed, dt, steeringAngle );
-            print self.curTheta;
+            #print self.curTheta;
 
             self.curLapTime = driver.state.curLapTime;
 
