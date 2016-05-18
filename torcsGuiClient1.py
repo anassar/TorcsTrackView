@@ -5,8 +5,10 @@ Created on Apr 4, 2012
 @author: lanquarden
 
 '''
-
-# This code builds on "lanquarden" code by adding mapping capabilities based on
+# @author: Ahmed Nassar
+# This code builds on "lanquarden" code from:
+# https://github.com/lanquarden/pyScrcClient
+# by adding mapping capabilities based on
 # guidelines and code snippets from this presentation:
 # "Virtual robotic car racing with Python and TORCS"
 # https://www.youtube.com/watch?v=BGOtqXA_y1E
